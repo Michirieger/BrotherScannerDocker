@@ -19,6 +19,7 @@ from sendtoftps import sendtoftps
 from trigger_inotify import trigger_inotify
 from trigger_telegram import trigger_telegram
 from ocr_queue import enqueue as enqueue_ocr
+import escl
 import jobstate
 import thumbnails
 
@@ -318,6 +319,17 @@ def scan_cmd(
     scan_source = os.environ.get("SCAN_SOURCE", "").strip()
     if scan_source and not any(arg.startswith("--source=") for arg in scanimage_args):
         mode_args.append(f"--source={scan_source}")
+    if escl.is_escl():
+        # eSCL (sane-airscan): Brother option names are translated, the device
+        # gets time to leave the Scan-to-PC dialog, and without an explicit
+        # source the ADF is used when it holds paper, as Brother's drivers do.
+        mode_args = escl.translate_args(mode_args)
+        scanimage_args = escl.translate_args(scanimage_args)
+        status = escl.wait_until_idle()
+        if not any(arg.startswith("--source=") for arg in mode_args + scanimage_args):
+            source = escl.default_source(status)
+            print(f"  eSCL: no source requested, using {source}")
+            mode_args.append(f"--source={source}")
     # `brother4:net1;dev0` device name gets passed to scanimage, which it refuses as an invalid device name
     #   for some reason.
     # Let's use the default scanner for now
@@ -346,9 +358,37 @@ def scan_cmd(
             and device_has_flatbed()
         ):
             print("  document feeder empty; retrying the scan from the flatbed")
-            execute_command(log, with_flatbed_source(scan_command), check=True, capture=True)
+            retry = with_flatbed_source(scan_command)
+            if escl.is_escl():
+                retry = escl.translate_args(retry)
+            execute_command(log, retry, check=True, capture=True)
         else:
             raise
+
+
+def copy_to_dir(log: TextIO, file_path: str) -> None:
+    """Copy a finished scan into COPY_TO_DIR, e.g. the consume folder of Paperless-ngx.
+
+    The copy is written under a temporary ".part" name and renamed when
+    complete, so a watcher on that folder never sees a partial PDF. Failures
+    are logged and do not fail the job.
+    """
+    target_dir = os.environ.get("COPY_TO_DIR", "").strip()
+    if not target_dir:
+        return
+    name = os.path.basename(file_path)
+    target = os.path.join(target_dir, name)
+    partial = os.path.join(target_dir, f".{name}.part")
+    try:
+        os.makedirs(target_dir, exist_ok=True)
+        shutil.copyfile(file_path, partial)
+        os.replace(partial, target)
+        print(f"  copied {name} to {target_dir}")
+    except OSError as error:
+        print(f"  ERROR: could not copy {name} to {target_dir}: {error}")
+        if os.path.exists(partial):
+            os.remove(partial)
+    log.flush()
 
 
 def notify(log: TextIO, file_path: str, message: str) -> None:
@@ -574,6 +614,8 @@ def convert_and_post_process(
         os.getenv("FTP_PATH"),
         output_pdf_file,
     )
+
+    copy_to_dir(log, output_pdf_file)
 
     clean_job_files(log, side, job_name)
 

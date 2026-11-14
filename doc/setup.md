@@ -66,6 +66,18 @@ A model unknown to both drivers runs on brscan4 with a generic profile, which ma
 
 One behaviour differs between the drivers: with an empty feeder and no `SCAN_SOURCE` set, brscan4 scans from the flatbed, while brscan5 aborts with "Document feeder out of documents". So that one button still works for both the feeder and the glass, a scan that finds the feeder empty is retried once from the flatbed (#180). Setting `SCAN_SOURCE` or `SCANNER_DRIVER=brscan4` keeps the old behaviour.
 
+### eSCL (driverless, arm64)
+
+Brother publishes its drivers for i386/amd64 only. On other architectures (arm64: Raspberry Pi, Home Assistant Green/Yellow) the image contains no Brother drivers and scans driverless over eSCL/AirScan with [sane-airscan](https://github.com/alexpevzner/sane-airscan) instead; `SCANNER_DRIVER=escl` selects this on amd64 too. Most network models since about 2017 offer eSCL (check `http://<IPADDRESS>/eSCL/ScannerCapabilities`). The device buttons need `SKEY_DAEMON=openskey`, which is chosen automatically where Brother's daemon is missing:
+
+```
+scanner driver: escl for model MFC-L2710DW
+```
+
+The pipeline is the same for both drivers. The Brother option names (`True Gray`, `24bit Color`, `Black & White`, `FlatBed`, `Automatic Document Feeder(...)`) are translated to the eSCL ones (`Gray`, `Color`, `Lineart`, `Flatbed`, `ADF`, `ADF Duplex`), so `SCAN_MODE`, `SCAN_SOURCE` and the API keep their values. Without a source the feeder is used when the device reports paper in it, else the flatbed. A scan waits up to `ESCL_IDLE_TIMEOUT` seconds for the device to report Idle, e.g. while it still shows the Scan-to-PC dialog after a button press.
+
+A [Home Assistant add-on](../homeassistant/brother_scanner/DOCS.md) is built from this image.
+
 ## Scanner buttons stop working
 
 Brother's `brscan-skey` daemon drives the device's front-panel Scan-to-PC buttons. It has a bug: it leaks one network socket every time it registers with the scanner, so after enough registration cycles it reaches its open-file limit and silently stops responding to button presses while web-UI and API scanning keep working (see [#179](https://github.com/PhilippMundhenk/BrotherScannerDocker/issues/179)). The leak is inside Brother's closed-source binary and cannot be fixed from here.

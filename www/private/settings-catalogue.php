@@ -24,7 +24,11 @@ return array(
     array('key' => 'KEEPALIVE_INTERVAL', 'group' => 'Scanner', 'type' => 'int', 'default' => '120', 'restart' => true, 'min' => 10, 'max' => 359,
           'description' => 'Seconds between registration refreshes (below the device lease of 360 s).'),
     array('key' => 'SCANNER_DRIVER', 'group' => 'Scanner', 'type' => 'string', 'default' => 'auto', 'restart' => true,
-          'description' => 'Brother SANE driver: auto (brscan4 when it knows the model, else brscan5), brscan4 or brscan5.'),
+          'description' => 'Scanner driver: auto (brscan4 when it knows the model, else brscan5; escl where the Brother drivers are not installed, e.g. arm64), brscan4, brscan5 or escl (driverless eSCL/AirScan).'),
+    array('key' => 'ESCL_URL', 'group' => 'Scanner', 'type' => 'string', 'default' => '', 'restart' => true,
+          'description' => 'eSCL service of the scanner for SCANNER_DRIVER=escl (empty: http://IPADDRESS/eSCL).'),
+    array('key' => 'ESCL_IDLE_TIMEOUT', 'group' => 'Scanner', 'type' => 'int', 'default' => '30', 'restart' => false, 'min' => 0, 'max' => 600,
+          'description' => 'eSCL: seconds a scan waits for the scanner to report Idle before it starts anyway.'),
     array('key' => 'SCANNER_PING_INTERVAL', 'group' => 'Scanner', 'type' => 'int', 'default' => '60', 'restart' => true, 'min' => 0, 'max' => 86400,
           'description' => 'Seconds between reachability checks of the scanner (0 disables).'),
     array('key' => 'SKEY_WATCHDOG', 'group' => 'Scanner', 'type' => 'bool', 'default' => 'true', 'restart' => true,
@@ -65,6 +69,8 @@ return array(
           'description' => 'Ink coverage in percent below which a page counts as blank and is removed (empty: keep all pages).'),
     array('key' => 'USE_JPEG_COMPRESSION', 'group' => 'Post-processing', 'type' => 'bool', 'default' => 'false', 'restart' => false,
           'description' => 'Store the pages as JPEG inside the PDF (much smaller files).'),
+    array('key' => 'COPY_TO_DIR', 'group' => 'Post-processing', 'type' => 'string', 'default' => '', 'restart' => false,
+          'description' => 'Copy every finished PDF into this folder, e.g. the consume folder of Paperless-ngx (empty: off).'),
 
     // --- OCR
     array('key' => 'OCR_SERVER', 'group' => 'OCR', 'type' => 'string', 'default' => '', 'restart' => false,

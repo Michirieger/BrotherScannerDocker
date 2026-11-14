@@ -151,6 +151,8 @@ echo "setting up configuration file:"
 source /opt/brother/config.sh
 # shellcheck source=files/skey.sh
 source /opt/brother/skey.sh
+# inside a Home Assistant add-on: its options are the environment
+load_addon_options
 CONFIG_FILE="$(config_file_path)"
 mkdir -p "$(dirname "$CONFIG_FILE")" && chmod 777 "$(dirname "$CONFIG_FILE")"
 mkdir -p /opt/brother/scanner
@@ -167,6 +169,11 @@ export FTP_PATH="${FTP_PATH:-/scans/}"
 # Which Scan-to-PC button daemon runs: Brother's brscan-skey (default) or
 # openskey, the open reimplementation (SKEY_DAEMON=openskey, see doc/setup.md).
 SKEY_DAEMON_CHOICE=$(skey_daemon_choice "${SKEY_DAEMON:-}")
+if [[ "$SKEY_DAEMON_CHOICE" == "brscan-skey" && ! -x /usr/bin/brscan-skey ]]; then
+  # Brother's daemon is amd64-only; elsewhere openskey is the only one
+  echo "brscan-skey is not installed on this architecture, using openskey"
+  SKEY_DAEMON_CHOICE=openskey
+fi
 SKEY_DAEMON_PROCESS=$(skey_daemon_process "$SKEY_DAEMON_CHOICE")
 echo "button daemon: $SKEY_DAEMON_CHOICE"
 echo "-----"
@@ -198,6 +205,14 @@ groupadd --gid "$GROUPID" NAS
 adduser "$NAME" --uid "$USERID" --gid "$GROUPID" --disabled-password --force-badname --gecos ""
 mkdir -p /scans
 chmod 777 /scans
+if [[ -n "$COPY_TO_DIR" ]]; then
+  # finished scans are copied there by the scan scripts, which run as $NAME
+  mkdir -p "$COPY_TO_DIR"
+  if ! su "$NAME" -s /bin/bash -c "test -w $(printf %q "$COPY_TO_DIR")"; then
+    chmod o+rwx "$COPY_TO_DIR" && echo "made $COPY_TO_DIR writable for $NAME"
+  fi
+  echo "copying finished scans to $COPY_TO_DIR"
+fi
 echo -n "" >/var/log/scanner.log
 chown "$NAME" /var/log/scanner.log
 chmod 666 /var/log/scanner.log
@@ -252,7 +267,23 @@ unregister_driver() { # $1 = 4|5
 BRSCAN4_CFG=/opt/brother/scanner/brscan4/brsanenetdevice4.cfg
 BRSCAN5_CFG=/opt/brother/scanner/brscan5/brsanenetdevice.cfg
 SCANNER_DRIVER="${SCANNER_DRIVER:-auto}"
+if [[ "${SCANNER_DRIVER,,}" != "escl" && ! -x /usr/bin/brsaneconfig4 ]]; then
+  # no Brother drivers on this architecture (they are amd64-only)
+  echo "Brother SANE drivers are not installed on this architecture, using eSCL"
+  SCANNER_DRIVER=escl
+fi
 case "${SCANNER_DRIVER,,}" in
+  escl)
+    # Driverless scanning over eSCL/AirScan (sane-airscan), see script/escl.py
+    ESCL_URL="${ESCL_URL:-http://$IPADDRESS/eSCL}"
+    export SANE_CONFIG_DIR=/opt/brother/scanner/sane.d
+    configure_escl "$NAME" "$ESCL_URL" "$SANE_CONFIG_DIR"
+    # the scan scripts start from a clean login shell and read env.txt
+    echo "SANE_CONFIG_DIR=$SANE_CONFIG_DIR" >>/opt/brother/scanner/env.txt
+    echo "ESCL_URL=$ESCL_URL" >>/opt/brother/scanner/env.txt
+    echo "eSCL device: $ESCL_URL"
+    DRIVER=escl
+    ;;
   brscan4)
     register_driver 4
     DRIVER=brscan4
@@ -438,7 +469,7 @@ echo "-----"
 echo "capabilities:"
 # the registered device (one backend, brother4 or brother5), then its option lists,
 # kept for /api/actions (device.capabilities)
-scanimage -L 2>&1 | grep -i 'brother' || true
+scanimage -L 2>&1 | grep -iE 'brother|airscan' || true
 scanimage -A > /tmp/SCANNER_CAPABILITIES 2>&1 || true
 chmod 644 /tmp/SCANNER_CAPABILITIES
 cat /tmp/SCANNER_CAPABILITIES

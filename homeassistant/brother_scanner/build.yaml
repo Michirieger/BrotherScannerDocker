@@ -1,0 +1,5 @@
+# The add-on runs the published multi-arch image of this repository
+# (.github/workflows/publishMaster.yml); the Dockerfile here only adapts it.
+build_from:
+  aarch64: ghcr.io/michirieger/brotherscannerdocker:latest
+  amd64: ghcr.io/michirieger/brotherscannerdocker:latest

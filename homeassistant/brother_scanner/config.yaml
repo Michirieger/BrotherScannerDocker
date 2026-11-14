@@ -1,0 +1,50 @@
+# Home Assistant add-on for BrotherScannerDocker: scan with the buttons on a
+# Brother scanner (Scan to PC) into a folder, e.g. the consume folder of the
+# Paperless-ngx add-on. Runs on amd64 (Brother drivers or eSCL) and aarch64
+# (eSCL, Brother publishes no ARM drivers); openskey handles the buttons.
+name: Brother Scanner
+version: "0.1.0"
+slug: brother_scanner
+description: Scan to file with the buttons on a Brother scanner (BrotherScannerDocker, eSCL on ARM)
+url: https://github.com/Michirieger/BrotherScannerDocker/tree/master/homeassistant/brother_scanner
+arch:
+  - aarch64
+  - amd64
+startup: application
+boot: auto
+init: false
+# The scanner sends button events to UDP 54925 of this host and is
+# registered over SNMP: both need the host network.
+host_network: true
+map:
+  - share:rw
+webui: "http://[HOST]:[PORT:8080]/"
+options:
+  ipaddress: ""
+  model: MFC-L2710DW
+  name: Scanner
+  scanner_driver: auto
+  skey_daemon: openskey
+  copy_to_dir: /share/paperless/consume
+  resolution: 300
+  rear_page_wait_seconds: 120
+  use_jpeg_compression: true
+  webserver: true
+  port: 8080
+schema:
+  ipaddress: str
+  host_ipaddress: str?
+  model: str
+  name: match(^\S+$)
+  scanner_driver: list(auto|escl|brscan4|brscan5)
+  skey_daemon: list(openskey|brscan-skey)
+  copy_to_dir: str?
+  resolution: list(100|150|200|300|600)
+  scan_mode: str?
+  scan_source: str?
+  rear_page_wait_seconds: int(0,600)
+  remove_blank_threshold: str?
+  use_jpeg_compression: bool
+  webserver: bool
+  port: port
+  api_token: password?

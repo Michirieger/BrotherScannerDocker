@@ -72,3 +72,51 @@ registration_known() {
   [[ -n "$line" ]] || return 1
   [[ "$line" != *" , Unknown , "* ]]
 }
+
+# load_addon_options [<options.json>]: export the options of a Home Assistant
+# add-on (/data/options.json, written by the Supervisor) as environment
+# variables, upper-cased (scan_mode -> SCAN_MODE). Booleans become true/false;
+# empty values and null are skipped so the built-in defaults apply. Called
+# before record_locked_keys, so the add-on configuration counts as environment
+# and wins over the configuration file. Does nothing outside an add-on.
+load_addon_options() {
+  local file="${1:-/data/options.json}" assignments
+  [[ -r "$file" ]] || return 0
+  assignments=$(python3 - "$file" <<'PY'
+import json, re, shlex, sys
+with open(sys.argv[1]) as handle:
+    options = json.load(handle)
+for key, value in options.items():
+    name = key.upper()
+    if not re.match(r"^[A-Z][A-Z0-9_]*$", name) or value is None:
+        continue
+    if isinstance(value, bool):
+        value = "true" if value else "false"
+    value = str(value)
+    if value == "":
+        continue
+    print(f"export {name}={shlex.quote(value)}")
+PY
+  ) || { echo "add-on: could not read $file"; return 0; }
+  eval "$assignments"
+  echo "add-on: $(grep -c '^export ' <<<"$assignments") option(s) loaded from $file"
+}
+
+# configure_escl <name> <url> <dir>: a private SANE configuration directory
+# with only the sane-airscan backend and the device at <url> (discovery off),
+# for SCANNER_DRIVER=escl. scanimage then finds exactly this device as its
+# default when SANE_CONFIG_DIR=<dir>; the system configuration (and the
+# Brother backends registered there) stays untouched.
+configure_escl() {
+  local name="$1" url="$2" dir="$3"
+  mkdir -p "$dir"
+  echo "airscan" >"$dir/dll.conf"
+  {
+    echo "[devices]"
+    echo "\"$name\" = $url, eSCL"
+    echo ""
+    echo "[options]"
+    echo "discovery = disable"
+  } >"$dir/airscan.conf"
+  chmod 755 "$dir" && chmod 644 "$dir/dll.conf" "$dir/airscan.conf"
+}

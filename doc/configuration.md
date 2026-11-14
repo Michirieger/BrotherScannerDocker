@@ -15,7 +15,9 @@ A value set in the container environment wins over the configuration file, and t
 | NAME                                     | mandatory | Arbitrary (avoid spaces) name to give your scanner. Displayed on scanner, if multiple servers are running.                                       |
 | MODEL                                    | mandatory | Model of your scanner (e.g., MFC-L2700DW)                                                                                                        |
 | IPADDRESS                                | mandatory | IP Address of your scanner                                                                                                                       |
-| SCANNER_DRIVER | optional | `auto`, `brscan4` or `brscan5`. Which Brother SANE driver registers and drives the device; `auto` takes brscan4 when it knows the model and brscan5 otherwise (default: auto, see [Setup](setup.md#scanner-driver)) |
+| SCANNER_DRIVER | optional | `auto`, `brscan4`, `brscan5` or `escl`. Which driver registers and drives the device; `auto` takes brscan4 when it knows the model and brscan5 otherwise, and `escl` where the Brother drivers are not installed (arm64). `escl` scans driverless over eSCL/AirScan with sane-airscan (default: auto, see [Setup](setup.md#scanner-driver)) |
+| ESCL_URL | optional | eSCL service of the scanner for `SCANNER_DRIVER=escl` (default: `http://IPADDRESS/eSCL`) |
+| ESCL_IDLE_TIMEOUT | optional | eSCL: seconds a scan waits for the scanner to report Idle (e.g. after a button press) before it starts anyway (default: 30) |
 | HOST_IPADDRESS | optional | IP address under which the scanner reaches this container (bridged networking, see [Setup](setup.md)); empty for host networking |
 | TZ | optional | Time zone for file names, logs and the web UI, e.g. `Europe/Berlin` (default: UTC) |
 | RESOLUTION                               | optional  | DPI resolution of scan, refer to capabilities of printer on startup                                                                              |
@@ -24,6 +26,7 @@ A value set in the container environment wins over the configuration file, and t
 | SCAN_LEFT_MM, SCAN_TOP_MM, SCAN_WIDTH_MM, SCAN_HEIGHT_MM | optional | Scan window in millimetres (defaults 0, 0, 215, 297). Use to calibrate the page position, e.g. `SCAN_HEIGHT_MM=295` removes the bar at the bottom of ADF scans |
 | REAR_PAGE_WAIT_SECONDS | optional | How long a front scan waits for a rear scan before it is converted to PDF (default: 120) |
 | REMOVE_BLANK_THRESHOLD                   | optional  | Percentage of content in page until which a page is considered blank. A good default is 0.3. Blank pages are removed if this variable is defined |
+| COPY_TO_DIR | optional | Copy every finished PDF into this folder, e.g. the consume folder of Paperless-ngx; written under a temporary name and renamed when complete |
 | REMOVE_ORIGINAL_AFTER_OCR                | optional  | Deletes the original scan, once OCR file is saved (default: false)                                                                               |
 | FTP_USER                                 | optional  | Username of an FTP(S) server to upload the completed scan to (see [Uploads and notifications](notifications.md))                                 |
 | FTP_PASSWORD                             | optional  | Password of an FTP(S) server to upload the completed scan to                                                                                     |

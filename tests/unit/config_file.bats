@@ -68,3 +68,30 @@ teardown() {
   ! registration_known "$CFG" Missing
   ! registration_known "$test_tmp/absent.cfg" Known
 }
+
+@test "add-on options become upper-case environment variables" {
+  cat >"$test_tmp/options.json" <<'JSON'
+{"ipaddress": "192.168.1.5", "webserver": true, "port": 8080, "scan_mode": "", "api_token": null, "copy_to_dir": "/share/a b"}
+JSON
+  unset IPADDRESS WEBSERVER PORT SCAN_MODE API_TOKEN COPY_TO_DIR
+  load_addon_options "$test_tmp/options.json"
+  [ "$IPADDRESS" = "192.168.1.5" ]
+  [ "$WEBSERVER" = "true" ]
+  [ "$PORT" = "8080" ]
+  [ "$COPY_TO_DIR" = "/share/a b" ]
+  [ -z "${SCAN_MODE+x}" ]
+  [ -z "${API_TOKEN+x}" ]
+}
+
+@test "no add-on options file outside an add-on" {
+  run load_addon_options "$test_tmp/none.json"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "configure_escl writes a private SANE configuration with only sane-airscan" {
+  configure_escl Scanner http://192.168.1.5/eSCL "$test_tmp/sane.d"
+  [ "$(cat "$test_tmp/sane.d/dll.conf")" = "airscan" ]
+  grep -qx '"Scanner" = http://192.168.1.5/eSCL, eSCL' "$test_tmp/sane.d/airscan.conf"
+  grep -qx 'discovery = disable' "$test_tmp/sane.d/airscan.conf"
+}

@@ -16,6 +16,11 @@ EOF
 
 FROM python:slim-bookworm
 
+# Brother publishes brscan4/brscan5/brscan-skey for i386/amd64 only. Other
+# architectures (arm64: Raspberry Pi, Home Assistant) scan over eSCL with
+# sane-airscan (SCANNER_DRIVER=escl, chosen automatically there) and use
+# openskey for the device buttons.
+ARG TARGETARCH
 RUN --mount=type=bind,source=requirements.txt,target=/tmp/requirements.txt <<EOF
 apt-get update && \
 apt-get -y --no-install-recommends install \
@@ -32,6 +37,7 @@ apt-get -y --no-install-recommends install \
   poppler-utils \
   procps \
   python3 \
+  sane-airscan \
   sane-utils \
   openssh-client \
   sshpass \
@@ -43,13 +49,18 @@ apt-get -y clean && \
 rm -rf /var/lib/apt/lists/* && \
 pip install --no-cache-dir -r /tmp/requirements.txt && \
 python3 -m pip uninstall --yes pip && \
-wget https://download.brother.com/welcome/dlf105200/brscan4-0.4.11-1.amd64.deb --progress=dot:giga -O /tmp/brscan4.deb && \
-wget https://download.brother.com/welcome/dlf104033/brscan5-1.7.0-0.amd64.deb --progress=dot:giga -O /tmp/brscan5.deb && \
-wget https://download.brother.com/welcome/dlf006652/brscan-skey-0.3.5-0.amd64.deb --progress=dot:giga -O /tmp/brscan-skey.deb && \
-dpkg -i --force-all /tmp/brscan4.deb && \
-dpkg -i --force-all /tmp/brscan5.deb && \
-dpkg -i --force-all /tmp/brscan-skey.deb && \
-rm -f /tmp/brscan4.deb /tmp/brscan5.deb /tmp/brscan-skey.deb
+if [ "${TARGETARCH:-amd64}" = "amd64" ]; then \
+  wget https://download.brother.com/welcome/dlf105200/brscan4-0.4.11-1.amd64.deb --progress=dot:giga -O /tmp/brscan4.deb && \
+  wget https://download.brother.com/welcome/dlf104033/brscan5-1.7.0-0.amd64.deb --progress=dot:giga -O /tmp/brscan5.deb && \
+  wget https://download.brother.com/welcome/dlf006652/brscan-skey-0.3.5-0.amd64.deb --progress=dot:giga -O /tmp/brscan-skey.deb && \
+  dpkg -i --force-all /tmp/brscan4.deb && \
+  dpkg -i --force-all /tmp/brscan5.deb && \
+  dpkg -i --force-all /tmp/brscan-skey.deb && \
+  rm -f /tmp/brscan4.deb /tmp/brscan5.deb /tmp/brscan-skey.deb; \
+else \
+  echo "no Brother drivers for $TARGETARCH: scanning over eSCL (sane-airscan) with openskey" && \
+  mkdir -p /opt/brother/scanner/brscan-skey; \
+fi
 EOF
 
 COPY files/runScanner.sh /opt/brother/runScanner.sh
