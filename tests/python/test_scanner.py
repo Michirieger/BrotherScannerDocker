@@ -104,11 +104,12 @@ def test_rear_page_wait_is_configurable(monkeypatch, clean_env):
     monkeypatch.setattr(scanner.time, "sleep", slept.append)
     monkeypatch.setattr(scanner, "convert_and_post_process", lambda *a, **k: None)
     scanner.wait_for_rear_pages_or_convert("job")
-    assert slept == [120]
+    # waited in steps of at most a second, to notice a finish request (finishjob.py)
+    assert sum(slept) == 120 and max(slept) <= 1
     clean_env.setenv("REAR_PAGE_WAIT_SECONDS", "3")
     slept.clear()
     scanner.wait_for_rear_pages_or_convert("job")
-    assert slept == [3]
+    assert sum(slept) == 3
 
 
 def test_waiting_status_is_cleared_after_wait(monkeypatch, tmp_path, clean_env):

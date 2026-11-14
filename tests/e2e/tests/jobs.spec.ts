@@ -100,6 +100,29 @@ test.describe('jobs API', () => {
     expect(again.status()).toBe(409);
   });
 
+  test('a waiting job can be finished without rear pages', async ({ request }) => {
+    // nothing waits yet: refused
+    expect((await request.post('/api/scanner/finish')).status()).toBe(409);
+    expect((await request.post('/api/jobs/2000-01-01-00-00-00/finish')).status()).toBe(404);
+    expect((await request.post('/api/jobs/not-a-job/finish')).status()).toBe(400);
+
+    const trigger = await (await request.post('/api/scanner/scanto', { form: { target: 'file' } })).json();
+    await waitForState(request, trigger.job, ['waiting_for_rear'], 30_000);
+    const finish = await request.post('/api/scanner/finish');
+    expect(finish.status()).toBe(200);
+    expect((await finish.json()).job).toBe(trigger.job);
+    const done = await waitForState(request, trigger.job, ['done'], 60_000);
+    expect(done.side).toBe('front');
+    // finished: not waiting any more
+    expect((await request.post(`/api/jobs/${trigger.job}/finish`)).status()).toBe(409);
+
+    // by id
+    const second = await (await request.post('/api/scanner/scanto', { form: { target: 'file' } })).json();
+    await waitForState(request, second.job, ['waiting_for_rear'], 30_000);
+    expect((await request.post(`/api/jobs/${second.job}/finish`)).status()).toBe(200);
+    await waitForState(request, second.job, ['done'], 60_000);
+  });
+
   test('wait=true answers after the scan script finished', async ({ request }) => {
     const res = await request.post('/api/scanner/scanto', { form: { target: 'file', wait: 'true' } });
     expect(res.status()).toBe(200);

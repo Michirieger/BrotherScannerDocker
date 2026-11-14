@@ -155,6 +155,18 @@ $router->map( 'POST', '/api/jobs/[char:job_id]/rear', function( $job_id) {
 });
 
 
+$router->map( 'POST', '/api/jobs/[char:job_id]/finish', function( $job_id) {
+    api_token_required();
+	require_once 'views/api/job-finish.php';
+});
+
+
+$router->map( 'POST', '/api/scanner/finish', function() {
+    api_token_required();
+	require_once 'views/api/job-finish.php';
+});
+
+
 $router->map( 'GET', '/api/file-list', function() {
 	require_once 'views/api/file-list.php';
 });

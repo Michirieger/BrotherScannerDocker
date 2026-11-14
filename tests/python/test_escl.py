@@ -149,3 +149,49 @@ def test_copy_to_dir_off_by_default(clean_env, tmp_path):
     source.write_bytes(b"x")
     scanner.copy_to_dir(io.StringIO(), str(source))
     assert [p.name for p in tmp_path.iterdir()] == ["scan.pdf"]
+
+
+def test_scan_targets_parse_and_validate(clean_env):
+    clean_env.setenv("SCAN_TARGETS", "PersonA=/share/a; PersonB = /share/b ;bad name=/x;PersonA=/dup;NoDir;Rel=relative")
+    assert scanner.scan_targets() == {"PersonA": "/share/a", "PersonB": "/share/b", "NoDir": "", "Rel": ""}
+
+
+def test_copy_to_dir_uses_the_target_folder(clean_env, tmp_path):
+    source = tmp_path / "scan.pdf"
+    source.write_bytes(b"x")
+    clean_env.setenv("COPY_TO_DIR", str(tmp_path / "default"))
+    clean_env.setenv("SCAN_TARGETS", f"PersonA={tmp_path / 'a'};PersonB=")
+    scanner.copy_to_dir(io.StringIO(), str(source), "PersonA")
+    assert (tmp_path / "a" / "scan.pdf").exists()
+    # a target without a folder, an unknown one and none use COPY_TO_DIR
+    for target in ("PersonB", "Unknown", ""):
+        scanner.copy_to_dir(io.StringIO(), str(source), target)
+    assert (tmp_path / "default" / "scan.pdf").exists()
+
+
+def test_the_picked_panel_name_becomes_the_job_target(clean_env):
+    clean_env.setenv("SCAN_TARGETS", "PersonA=/share/a;PersonB=/share/b")
+    clean_env.setenv("SKEY_USER", "PersonB")
+    scanner.apply_scan_target()
+    assert scanner.job_trigger(False)["target"] == "PersonB"
+    assert "target" not in scanner.job_trigger(True)
+    # a name that is not a target (stale entry, other host) is not recorded
+    clean_env.setenv("SKEY_USER", "Stranger")
+    scanner.apply_scan_target()
+    assert "target" not in scanner.job_trigger(False)
+
+
+def test_waiting_for_rear_pages_ends_early_on_the_finish_flag(clean_env, tmp_path, monkeypatch):
+    monkeypatch.setattr(scanner.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.setattr(scanner, "set_status", lambda _s: None)
+    monkeypatch.setattr(scanner, "clear_status", lambda _s: None)
+    converted = []
+    monkeypatch.setattr(scanner, "convert_and_post_process", lambda job, side, _t: converted.append((job, side)))
+    job = "2026-01-02-03-04-05"
+    (tmp_path / job).mkdir()
+    (tmp_path / job / scanner.FINISH_FLAG).write_text("finish\n")
+    clean_env.setenv("REAR_PAGE_WAIT_SECONDS", "600")
+    started = scanner.time.monotonic()
+    scanner.wait_for_rear_pages_or_convert(job)
+    assert scanner.time.monotonic() - started < 5
+    assert converted == [(job, "front")]

@@ -67,19 +67,23 @@ start_openskey() {
   local host_ip="${HOST_IPADDRESS:-$(interface_ipv4 "$interface")}"
   local script_dir=/opt/brother/scanner/brscan-skey/script
   local env_file=/opt/brother/scanner/openskey.env
-  local func
+  local func names
+  # every Scan-to-PC target (SCAN_TARGETS) is a name on the panel; openskey
+  # registers them all and tells the scan script which one was picked
+  # (SKEY_USER), which picks the target's folder (script/scanner.py)
+  names=$(scan_targets "${SCAN_TARGETS-}" "$NAME" "" | cut -f1 | paste -sd, -)
   {
-    printf 'export NAME=%q IPADDRESS=%q HOST_IPADDRESS=%q\n' "$NAME" "$IPADDRESS" "$host_ip"
+    printf 'export NAME=%q SKEY_NAMES=%q IPADDRESS=%q HOST_IPADDRESS=%q\n' "$NAME" "$names" "$IPADDRESS" "$host_ip"
     printf 'export KEEPALIVE_INTERVAL=%q SKEY_DEVICE_PORT=%q\n' "${KEEPALIVE_INTERVAL:-120}" "${SKEY_DEVICE_PORT:-161}"
     # never re-register while a scan runs or a front scan waits for rear pages
     printf 'export SKEY_HOLD_FILES=%q\n' "/tmp/STATUS_SCAN:/tmp/STATUS_WAITING"
     for func in file email image ocr; do
-      printf "export SKEY_%s='python3 %s/scanto%s.py \"\$1\" \"\$2\"'\n" "${func^^}" "$script_dir" "$func"
+      printf "export SKEY_%s='python3 %s/%s \"\$1\" \"\$2\"'\n" "${func^^}" "$script_dir" "$(skey_script "$func" "${IMAGE_BUTTON-}")"
     done
   } >"$env_file"
   chown "$NAME" "$env_file" && chmod 600 "$env_file"
   su - "$NAME" -s /bin/bash -c "source $env_file; exec /usr/local/bin/openskey" >>/var/log/scanner.log 2>&1 &
-  echo "openskey started as $NAME (pid $!, device $IPADDRESS:${SKEY_DEVICE_PORT:-161}, host $host_ip)"
+  echo "openskey started as $NAME (pid $!, device $IPADDRESS:${SKEY_DEVICE_PORT:-161}, host $host_ip, panel names: $names)"
 }
 
 # skey_watchdog: restart the daemon if it has died or its open-file count has
@@ -205,14 +209,19 @@ groupadd --gid "$GROUPID" NAS
 adduser "$NAME" --uid "$USERID" --gid "$GROUPID" --disabled-password --force-badname --gecos ""
 mkdir -p /scans
 chmod 777 /scans
-if [[ -n "$COPY_TO_DIR" ]]; then
-  # finished scans are copied there by the scan scripts, which run as $NAME
-  mkdir -p "$COPY_TO_DIR"
-  if ! su "$NAME" -s /bin/bash -c "test -w $(printf %q "$COPY_TO_DIR")"; then
-    chmod o+rwx "$COPY_TO_DIR" && echo "made $COPY_TO_DIR writable for $NAME"
+# finished scans are copied to COPY_TO_DIR and the SCAN_TARGETS folders by the
+# scan scripts, which run as $NAME
+while IFS=$'\t' read -r _target copy_dir; do
+  [[ -n "$copy_dir" ]] || continue
+  mkdir -p "$copy_dir"
+  if ! su "$NAME" -s /bin/bash -c "test -w $(printf %q "$copy_dir")"; then
+    chmod o+rwx "$copy_dir" && echo "made $copy_dir writable for $NAME"
   fi
-  echo "copying finished scans to $COPY_TO_DIR"
-fi
+  echo "copying finished scans of $_target to $copy_dir"
+done < <(
+  scan_targets "${SCAN_TARGETS-}" "$NAME" "${COPY_TO_DIR-}"
+  [[ -n "$COPY_TO_DIR" ]] && printf 'default\t%s\n' "$COPY_TO_DIR"
+)
 echo -n "" >/var/log/scanner.log
 chown "$NAME" /var/log/scanner.log
 chmod 666 /var/log/scanner.log
@@ -246,6 +255,9 @@ else
 fi
 echo "-----"
 
+# the Image button runs scantoimage.py, or finishes the job waiting for rear
+# pages with IMAGE_BUTTON=finish
+sed -i "s#^IMAGE=.*#IMAGE=\"python3 /opt/brother/scanner/brscan-skey/script/$(skey_script image "${IMAGE_BUTTON-}")\"#" /opt/brother/scanner/brscan-skey/brscan-skey.config
 echo "whole config:"
 cat /opt/brother/scanner/brscan-skey/brscan-skey.config
 echo "-----"

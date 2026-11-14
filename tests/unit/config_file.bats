@@ -95,3 +95,12 @@ JSON
   grep -qx '"Scanner" = http://192.168.1.5/eSCL, eSCL' "$test_tmp/sane.d/airscan.conf"
   grep -qx 'discovery = disable' "$test_tmp/sane.d/airscan.conf"
 }
+
+@test "add-on list options become a SCAN_TARGETS string" {
+  cat >"$test_tmp/options.json" <<'JSON'
+{"scan_targets": [{"name": "PersonA", "copy_to_dir": "/share/a"}, {"name": "PersonB", "copy_to_dir": "/share/b"}]}
+JSON
+  unset SCAN_TARGETS
+  load_addon_options "$test_tmp/options.json"
+  [ "$SCAN_TARGETS" = "PersonA=/share/a;PersonB=/share/b" ]
+}

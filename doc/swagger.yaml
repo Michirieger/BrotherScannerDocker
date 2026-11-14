@@ -464,6 +464,54 @@ paths:
         '409':
           description: Job is not waiting for rear pages
 
+  /jobs/{id}/finish:
+    post:
+      summary: Finish a job that waits for rear pages now, without them
+      description: The front pages are converted to PDF at once instead of after REAR_PAGE_WAIT_SECONDS.
+      security:
+        - bearer: []
+        - header: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The job converts now
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TriggerResponse'
+        '400':
+          description: Invalid id
+        '401':
+          description: API token required
+        '404':
+          description: Unknown job
+        '409':
+          description: Job is not waiting for rear pages
+
+  /scanner/finish:
+    post:
+      summary: Finish the newest job that waits for rear pages, without them
+      description: For a single-sided document, so the next one can be scanned without waiting (also the Image button with IMAGE_BUTTON=finish).
+      security:
+        - bearer: []
+        - header: []
+      responses:
+        '200':
+          description: The job converts now
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TriggerResponse'
+        '401':
+          description: API token required
+        '409':
+          description: No job is waiting for rear pages
+
   /file-list:
     get:
       summary: List Scanned Files

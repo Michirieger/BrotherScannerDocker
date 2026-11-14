@@ -118,3 +118,53 @@ interface_ipv4() {
   [[ -n "$iface" ]] || return 1
   ip -4 -o addr show dev "$iface" 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1
 }
+
+# skey_script <function> [<IMAGE_BUTTON>]: the scan script a device button
+# runs. The Image button scans to an image (scantoimage.py), or with
+# IMAGE_BUTTON=finish finishes the job that waits for rear pages at once
+# (finishjob.py), so single documents need no wait.
+skey_script() {
+  if [[ "$1" == "image" && "${2,,}" == "finish" ]]; then
+    echo finishjob.py
+  else
+    echo "scanto$1.py"
+  fi
+}
+
+# scan_targets [<SCAN_TARGETS>] [<NAME>] [<COPY_TO_DIR>]: the Scan-to-PC
+# targets to register on the device, one "name<TAB>folder" line each.
+# SCAN_TARGETS lists several, "Name=/folder;Other=/other" (the folder may be
+# empty: COPY_TO_DIR then applies), so that e.g. each person picks their own
+# name on the panel and their scans land in their own folder. Unset, there is
+# the single target NAME. Names are 1-15 letters, digits, "_" or "-" (what the
+# panel shows); invalid or duplicate entries are skipped with a warning on
+# stderr. openskey only: it registers every name (SKEY_NAMES) and hands the
+# picked one to the scan script.
+scan_targets() {
+  local spec="${1-}" name="${2:-Scanner}" default_dir="${3-}" entry target dir seen=" "
+  if [[ -z "${spec// /}" ]]; then
+    printf '%s\t%s\n' "$name" "$default_dir"
+    return 0
+  fi
+  local IFS=';'
+  for entry in $spec; do
+    [[ -z "${entry// /}" ]] && continue
+    target="${entry%%=*}"
+    dir=""
+    [[ "$entry" == *=* ]] && dir="${entry#*=}"
+    target="${target#"${target%%[![:space:]]*}"}"
+    target="${target%"${target##*[![:space:]]}"}"
+    dir="${dir#"${dir%%[![:space:]]*}"}"
+    dir="${dir%"${dir##*[![:space:]]}"}"
+    if [[ ! "$target" =~ ^[A-Za-z0-9_-]{1,15}$ ]]; then
+      echo "SCAN_TARGETS: ignoring invalid target name '$target' (1-15 letters, digits, _ or -)" >&2
+      continue
+    fi
+    if [[ "$seen" == *" $target "* ]]; then
+      echo "SCAN_TARGETS: ignoring duplicate target '$target'" >&2
+      continue
+    fi
+    seen+="$target "
+    printf '%s\t%s\n' "$target" "${dir:-$default_dir}"
+  done
+}

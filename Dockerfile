@@ -3,8 +3,9 @@
 # for the end-to-end tests, built from a pinned commit of
 # https://github.com/PhilippMundhenk/openskey (#188).
 FROM rust:1-slim-bookworm AS openskey
-ARG OPENSKEY_REPO=https://github.com/PhilippMundhenk/openskey.git
-ARG OPENSKEY_REF=b986735ad4ced6be874e97a898dae2a5b6907b66
+# Fork with several panel names (SKEY_NAMES) until that is merged upstream
+ARG OPENSKEY_REPO=https://github.com/Michirieger/openskey.git
+ARG OPENSKEY_REF=c624a38a4ba0bd2846266ecacdf2589f6dfb1edf
 RUN <<EOF
 apt-get update && \
 apt-get -y --no-install-recommends install git ca-certificates && \

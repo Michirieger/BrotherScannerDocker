@@ -95,7 +95,7 @@ Brother does not support its Linux drivers, so the leak above cannot be fixed at
 
 ```
 button daemon: openskey
-openskey started as Scanner (device 192.168.1.50:161, host 192.168.1.10)
+openskey started for target Scanner as Scanner (pid 42, device 192.168.1.50:161, host 192.168.1.10:54925)
 openskey: registered Scan-to-PC for "Scanner", registration verified
 ```
 

@@ -92,6 +92,12 @@ for key, value in options.items():
         continue
     if isinstance(value, bool):
         value = "true" if value else "false"
+    elif isinstance(value, list):
+        # scan_targets: [{name, copy_to_dir}] -> "Name=/dir;Other=/dir"
+        value = ";".join(
+            f"{item.get('name', '')}={item.get('copy_to_dir', '') or ''}" if isinstance(item, dict) else str(item)
+            for item in value
+        )
     value = str(value)
     if value == "":
         continue

@@ -85,6 +85,7 @@ def read_environment() -> None:
             os.environ[key] = value
     apply_config_file()
     apply_timezone()
+    apply_scan_target()
 
 
 def parse_config_file(path: str) -> Dict[str, str]:
@@ -366,14 +367,60 @@ def scan_cmd(
             raise
 
 
-def copy_to_dir(log: TextIO, file_path: str) -> None:
-    """Copy a finished scan into COPY_TO_DIR, e.g. the consume folder of Paperless-ngx.
+TARGET_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,15}$")
+
+
+def scan_targets() -> Dict[str, str]:
+    """SCAN_TARGETS ("Name=/folder;Other=/folder") as {name: folder}.
+
+    The same rules as the entrypoint (files/skey.sh scan_targets): names of
+    1-15 letters, digits, "_" or "-", the first of repeated names wins, an
+    empty folder means COPY_TO_DIR. Folders must be absolute paths.
+    """
+    targets: Dict[str, str] = {}
+    for entry in os.environ.get("SCAN_TARGETS", "").split(";"):
+        name, _, folder = entry.partition("=")
+        name, folder = name.strip(), folder.strip()
+        if not TARGET_NAME_PATTERN.match(name) or name in targets:
+            continue
+        if folder and not os.path.isabs(folder):
+            print(f"  WARNING: SCAN_TARGETS folder {folder!r} of {name} is not absolute, using COPY_TO_DIR")
+            folder = ""
+        targets[name] = folder
+    return targets
+
+
+def scan_target_dir(name: str) -> str:
+    """The folder of the panel target `name`, or "" (then COPY_TO_DIR applies)."""
+    return scan_targets().get(name.strip(), "") if name.strip() else ""
+
+
+def apply_scan_target() -> None:
+    """Record which panel target started this scan (SCAN_TARGET).
+
+    openskey passes the name picked on the panel as SKEY_USER (and as the
+    friendly-name argument); only a name listed in SCAN_TARGETS counts.
+    """
+    picked = os.environ.get("SKEY_USER", "").strip()
+    if picked and picked in scan_targets():
+        os.environ["SCAN_TARGET"] = picked
+    else:
+        os.environ.pop("SCAN_TARGET", None)
+
+
+def copy_to_dir(log: TextIO, file_path: str, target: Optional[str] = None) -> None:
+    """Copy a finished scan into its target's folder or COPY_TO_DIR, e.g. the consume folder of Paperless-ngx.
 
     The copy is written under a temporary ".part" name and renamed when
     complete, so a watcher on that folder never sees a partial PDF. Failures
     are logged and do not fail the job.
     """
-    target_dir = os.environ.get("COPY_TO_DIR", "").strip()
+    # a scan started from one of several panel targets (SCAN_TARGETS) goes to
+    # that target's folder, every other scan to COPY_TO_DIR
+    if target is None:
+        target = os.environ.get("SCAN_TARGET", "")
+    target_dir = (scan_target_dir(target)
+                  or os.environ.get("COPY_TO_DIR", "").strip())
     if not target_dir:
         return
     name = os.path.basename(file_path)
@@ -615,7 +662,9 @@ def convert_and_post_process(
         output_pdf_file,
     )
 
-    copy_to_dir(log, output_pdf_file)
+    # the job's target comes from its record: a rear scan (API or another
+    # button) finishes the job of whoever scanned the front
+    copy_to_dir(log, output_pdf_file, (jobstate.read(job_name) or {}).get("target", ""))
 
     clean_job_files(log, side, job_name)
 
@@ -639,13 +688,34 @@ def rear_page_wait_seconds() -> int:
     return int(os.environ.get("REAR_PAGE_WAIT_SECONDS", "120"))
 
 
+FINISH_FLAG = ".finish"
+
+
+def finish_flag_path(job_name: str) -> str:
+    """File that asks a job waiting for rear pages to convert at once (finishjob.py)."""
+    return os.path.join(tempfile.gettempdir(), job_name, FINISH_FLAG)
+
+
 def wait_for_rear_pages_or_convert(job_name: str) -> None:
-    # Wait for 2 minutes in case there is a rear side scan
+    # Wait REAR_PAGE_WAIT_SECONDS in case there is a rear side scan, or until
+    # the job is finished early (finishjob.py: API or the Image button)
     wait_seconds = rear_page_wait_seconds()
     print(f"  front side: Waiting {wait_seconds}s for rear pages before starting file conversion for {job_name}")
+    flag = finish_flag_path(job_name)
+    waited = 0.0
     try:
         set_status('waiting')
-        time.sleep(wait_seconds)
+        # counts the time slept rather than reading a clock, so a test that
+        # replaces time.sleep does not spin
+        while True:
+            if os.path.exists(flag):
+                print(f"  front side: finish requested for {job_name}, converting without rear pages")
+                break
+            step = min(1.0, wait_seconds - waited)
+            if step <= 0:
+                break
+            time.sleep(step)
+            waited += step
     finally:
         clear_status('waiting')
 
@@ -729,6 +799,10 @@ def job_trigger(job_name_given: bool) -> Dict[str, Any]:
     if job_name_given:
         return {"trigger": "api"}
     record: Dict[str, Any] = {"trigger": "button"}
+    # the Scan-to-PC target picked on the panel (SCAN_TARGETS), e.g. a person
+    target = os.environ.get("SCAN_TARGET", "").strip()
+    if target:
+        record["target"] = target
     button: Dict[str, Any] = {}
     function = os.environ.get("SKEY_FUNC", "").strip().lower()
     if function:

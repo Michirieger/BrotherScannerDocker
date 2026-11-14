@@ -3,7 +3,7 @@
 # Paperless-ngx add-on. Runs on amd64 (Brother drivers or eSCL) and aarch64
 # (eSCL, Brother publishes no ARM drivers); openskey handles the buttons.
 name: Brother Scanner
-version: "0.1.1"
+version: "0.2.0"
 slug: brother_scanner
 description: Scan to file with the buttons on a Brother scanner (BrotherScannerDocker, eSCL on ARM)
 url: https://github.com/Michirieger/BrotherScannerDocker/tree/master/homeassistant/brother_scanner
@@ -26,6 +26,8 @@ options:
   scanner_driver: auto
   skey_daemon: openskey
   copy_to_dir: /share/paperless/consume
+  scan_targets: []
+  image_button: image
   resolution: 300
   rear_page_wait_seconds: 120
   use_jpeg_compression: true
@@ -39,6 +41,10 @@ schema:
   scanner_driver: list(auto|escl|brscan4|brscan5)
   skey_daemon: list(openskey|brscan-skey)
   copy_to_dir: str?
+  scan_targets:
+    - name: match(^[A-Za-z0-9_-]{1,15}$)
+      copy_to_dir: str?
+  image_button: list(image|finish)
   resolution: list(100|150|200|300|600)
   scan_mode: str?
   scan_source: str?

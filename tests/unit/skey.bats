@@ -208,3 +208,31 @@ STUB
   run device_reachable 127.0.0.1
   [ "$status" -eq 1 ]
 }
+
+@test "scan_targets: one target per entry, folder defaults to COPY_TO_DIR" {
+  run scan_targets "PersonA=/share/a; PersonB = /share/b ;Nodir" Scanner /share/consume
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = $'PersonA\t/share/a' ]
+  [ "${lines[1]}" = $'PersonB\t/share/b' ]
+  [ "${lines[2]}" = $'Nodir\t/share/consume' ]
+}
+
+@test "scan_targets: unset means the single target NAME" {
+  run scan_targets "" Scanner /share/consume
+  [ "$output" = $'Scanner\t/share/consume' ]
+}
+
+@test "scan_targets: invalid and duplicate names are skipped" {
+  run scan_targets "bad name=/x;Ok=/y;Ok=/z;waytoolongtargetname=/q" Scanner ""
+  [[ "$output" == *$'Ok\t/y'* ]]
+  [[ "$output" != *"/z"* ]]
+  [[ "$output" != *"/x"* ]]
+  [[ "$output" != *"/q"* ]]
+}
+
+@test "skey_script: the Image button scans, or finishes the waiting job" {
+  [ "$(skey_script file)" = "scantofile.py" ]
+  [ "$(skey_script image)" = "scantoimage.py" ]
+  [ "$(skey_script image FINISH)" = "finishjob.py" ]
+  [ "$(skey_script file finish)" = "scantofile.py" ]
+}

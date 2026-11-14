@@ -28,6 +28,8 @@ add-on (`/share/paperless/consume`).
 | `name` | Name shown on the scanner display (no spaces) |
 | `scanner_driver` | `auto`, `escl`, `brscan4`, `brscan5` |
 | `copy_to_dir` | Folder that receives every finished PDF; empty to disable |
+| `scan_targets` | Several names on the scanner panel, each with its own folder, e.g. one per person (see below) |
+| `image_button` | `finish`: the **Image** button on the scanner finishes the current scan at once instead of waiting for rear pages (see below) |
 | `resolution` | dpi |
 | `scan_mode` / `scan_source` | Optional, e.g. `True Gray` / `FlatBed` (Brother names work with eSCL too) |
 | `rear_page_wait_seconds` | How long a front-side scan waits for the rear pages (manual duplex) before the PDF is made; `0` for no wait |
@@ -37,8 +39,38 @@ add-on (`/share/paperless/consume`).
 Every other setting of BrotherScannerDocker (README) can be set in the web
 UI's settings page.
 
+## Several people
+
+With `scan_targets` every person gets their own entry in the scanner's
+Scan-to-PC list and their own folder:
+
+```yaml
+scan_targets:
+  - name: PersonA
+    copy_to_dir: /share/paperless/consume/person_a
+  - name: PersonB
+    copy_to_dir: /share/paperless/consume/person_b
+```
+
+On the scanner: Scan → File → pick your name → Start. One openskey daemon
+registers all names. In Paperless-ngx enable `consumer_recursive` and add a
+workflow per folder ("Consumption started", path filter
+`*/consume/person_b/*`) that assigns the owner. Scans started from the web UI
+or the Home Assistant buttons go to `copy_to_dir`.
+
+## Single-sided documents without waiting
+
+After the front pages every scan waits `rear_page_wait_seconds` for a rear
+scan (manual duplex: turn the stack, scan with **E-mail**). To go on at once:
+
+- the **Finish without rear pages** button of the Home Assistant integration,
+  or `POST /api/scanner/finish`;
+- with `image_button: finish`, the **Image** button on the scanner. The panel
+  then waits for a scan that does not come; press Cancel (Stop) and scan the
+  next document.
+
 ## Requirements
 
-- The scanner must reach Home Assistant on UDP 54925 (same network).
+- The scanner must reach Home Assistant on UDP 54925 (and 54926, ... for further `scan_targets`), i.e. be in the same network.
 - For Paperless-ngx: the add-on must be running; it consumes and removes the
   files from `/share/paperless/consume`.
