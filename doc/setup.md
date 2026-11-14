@@ -133,9 +133,50 @@ The four scanner buttons map to these actions:
 - **Scan to File** scans the front page(s) and waits up to two minutes (`REAR_PAGE_WAIT_SECONDS`) before converting to PDF.
 - **Scan to E-mail** within that time (scanner button, web UI or API) scans the rear of the same stack: turn the stack over, no resorting needed. Both sides are interleaved into one PDF.
 - **Scan to OCR** is Scan to File in gray mode.
-- **Scan to Image** is a placeholder that only logs a message; mount your own script to use it (see [Customizing the scan scripts](customizing.md)).
+- **Scan to Image** is a placeholder that only logs a message; mount your own script to use it (see [Customizing the scan scripts](customizing.md)). With `IMAGE_BUTTON=finish` it finishes the waiting scan instead (see below).
 
 If OCR, FTP, SSH or Telegram options are set, they run after every finished PDF.
+
+### Single-sided documents without the wait
+
+For a single-sided document the two-minute wait for rear pages is in the way. A waiting scan can be finished at once, without rear pages:
+
+- `POST /api/scanner/finish` finishes the newest waiting scan, `POST /api/jobs/<id>/finish` a given one (the Home Assistant integration's **Finish without rear pages** button uses this);
+- with `IMAGE_BUTTON=finish`, **Scan to Image** on the device does the same. The device then shows "connecting to PC" for a scan that never comes; press Stop.
+
+The scan keeps its own [target](#several-people-scan-targets): it does not matter under which name the Image button is pressed.
+
+## Several people: scan targets
+
+By default the container registers one Scan-to-PC destination on the device, `NAME` ("Scanner"), and every scan lands in the same place. With `SCAN_TARGETS` several destinations appear in the device's Scan-to-PC list, for example one per person in a household, and every destination has its own output folder:
+
+```yaml
+    environment:
+      - SKEY_DAEMON=openskey
+      - SCAN_TARGETS=PersonA=/consume/person_a;PersonB=/consume/person_b
+      - COPY_TO_DIR=/consume
+    volumes:
+      - /path/to/paperless/consume:/consume
+```
+
+On the device: **Scan → File → PersonB → Start**. The PDF is made as usual (in `/scans`, with OCR, uploads and notifications) and then copied to that target's folder.
+
+How it works and what to know:
+
+- **Format:** `Name=/folder` entries separated by `;`. Names are 1-15 letters, digits, `_` or `-` (what the panel can show); invalid or repeated entries are skipped with a warning in the log. A target without a folder (`PersonA=`) uses `COPY_TO_DIR`.
+- **openskey only:** the device sends the picked name with every button press; openskey registers all names (`SKEY_NAMES`) and hands the picked one to the scan script. Brother's `brscan-skey` registers a single name, so `SCAN_TARGETS` needs `SKEY_DAEMON=openskey` (the default on arm64).
+- **One job, one target:** the target is recorded with the job (`target` in `GET /api/jobs/<id>`). A rear-page scan or an early finish completes the job of whoever scanned the front pages, whichever name they are pressed under.
+- **Scans started elsewhere** (web UI, API, Home Assistant buttons) have no target and go to `COPY_TO_DIR`.
+- **Folders** are created at startup and made writable for the scan user; mount them into the container.
+
+### Handing scans to Paperless-ngx (`COPY_TO_DIR`)
+
+`COPY_TO_DIR` (and the target folders) receive a copy of every finished PDF. The copy is written under a temporary name (`.<file>.part`) and renamed when complete, so a folder watcher such as the consume folder of [Paperless-ngx](https://docs.paperless-ngx.com/) never picks up a partial file. The original stays in `/scans`.
+
+With one folder per person, let Paperless-ngx tell them apart:
+
+1. enable recursive consumption (`PAPERLESS_CONSUMER_RECURSIVE=true`),
+2. add a workflow per folder: trigger *Consumption started*, path filter `*/consume/person_b/*`, action *assign owner* (and permissions, if the documents should stay private).
 
 ## Duplex scanners
 
