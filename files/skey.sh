@@ -183,3 +183,9 @@ All options specific to device `brother-net' (Brother network protocol):
         The device scans from the feeder when it holds paper, else from the glass.
 CAPS
 }
+
+# scan_scripts_running: true (0) while a scan script or the PDF conversion it
+# forked is running (the processes of scanto*.py and the rear-page wait).
+scan_scripts_running() {
+  pgrep -f 'brscan-skey/script/scanto(file|email|ocr|image)\.py' >/dev/null 2>&1
+}

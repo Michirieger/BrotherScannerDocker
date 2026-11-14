@@ -236,3 +236,8 @@ STUB
   [ "$(skey_script image FINISH)" = "finishjob.py" ]
   [ "$(skey_script file finish)" = "scantofile.py" ]
 }
+
+@test "scan_scripts_running: only the scan scripts count" {
+  run scan_scripts_running
+  [ "$status" -ne 0 ]
+}

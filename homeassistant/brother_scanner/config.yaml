@@ -3,7 +3,7 @@
 # Paperless-ngx add-on. Runs on amd64 (Brother drivers) and aarch64 (Brother's
 # network protocol in Python, brother-net); openskey handles the buttons.
 name: Brother Scanner
-version: "0.3.0"
+version: "0.3.1"
 slug: brother_scanner
 description: Scan to file with the buttons on a Brother scanner (BrotherScannerDocker, also on ARM)
 url: https://github.com/Michirieger/BrotherScannerDocker/tree/master/homeassistant/brother_scanner
@@ -16,6 +16,11 @@ init: false
 # The scanner sends button events to UDP 54925 of this host and is
 # registered over SNMP: both need the host network.
 host_network: true
+# The Supervisor restarts the add-on when the API stops answering (with the
+# default port; adjust the URL when you change `port`), and gives a stopping
+# add-on time to turn waiting scans into PDFs (STOP_TIMEOUT 20 s inside).
+watchdog: "http://[HOST]:[PORT:8080]/api/scanner/status"
+timeout: 30
 map:
   - share:rw
 webui: "http://[HOST]:[PORT:8080]/"
