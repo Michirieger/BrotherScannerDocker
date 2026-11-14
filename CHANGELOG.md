@@ -6,6 +6,7 @@ All notable changes to the container. The Home Assistant integration, which incl
 
 ### Added
 
+- Graceful stop: on `docker stop` the container turns scans that wait for rear pages into PDFs and waits up to `STOP_TIMEOUT` seconds for running scans, instead of being killed after the grace period with the front pages lost. The Home Assistant add-on gets a Supervisor watchdog and a 30 s stop timeout.
 - `SCANNER_DRIVER=brother-net`: Brother's network scan protocol (TCP 54921) spoken directly by `script/brother_net.py`, without a SANE backend. Default where the Brother drivers are not installed (arm64); button scans run in the device's Scan-to-PC session as with Brother's driver. Written from network captures, checked against Brother's output.
 - `SCANNER_DRIVER=escl` scans driverless over eSCL/AirScan with sane-airscan. Brother publishes its drivers for amd64 only; the image now also builds for arm64 (Raspberry Pi, Home Assistant), where it chooses eSCL and openskey automatically. Brother option names (`True Gray`, `FlatBed`, ...) are translated, the feeder is used when it holds paper, and a scan waits for the device to be idle (`ESCL_URL`, `ESCL_IDLE_TIMEOUT`).
 - `COPY_TO_DIR` copies every finished PDF into a folder, e.g. the consume folder of Paperless-ngx, under a temporary name that is renamed when complete.

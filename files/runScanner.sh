@@ -497,10 +497,41 @@ fi
 chmod 644 /tmp/SCANNER_CAPABILITIES
 cat /tmp/SCANNER_CAPABILITIES
 
+# stop_gracefully: on SIGTERM/SIGINT (docker stop, Home Assistant stopping
+# the add-on) finish the jobs that wait for rear pages, so their front pages
+# become PDFs instead of being killed with the waiting process, and give
+# running scans and conversions up to STOP_TIMEOUT seconds (default 20; keep
+# it below the stop grace period: compose stop_grace_period, add-on timeout).
+stop_gracefully() {
+  echo "stopping: finishing scans that wait for rear pages"
+  su - "$NAME" -s /bin/bash -c "python3 /opt/brother/scanner/brscan-skey/script/finishjob.py --all" >>/var/log/scanner.log 2>&1 || true
+  local limit="${STOP_TIMEOUT:-20}" waited=0
+  [[ "$limit" =~ ^[0-9]+$ ]] || limit=20
+  while scan_scripts_running && [[ "$waited" -lt "$limit" ]]; do
+    sleep 1
+    waited=$((waited + 1))
+  done
+  if scan_scripts_running; then
+    echo "stopping: scans still running after ${limit}s, stopping anyway"
+  else
+    echo "stopping: no scan running (waited ${waited}s)"
+  fi
+  pkill -x openskey 2>/dev/null || true
+  pkill -x brscan-skey-exe 2>/dev/null || true
+  pkill -x lighttpd 2>/dev/null || true
+  [[ -n "$TAIL_PID" ]] && kill "$TAIL_PID" 2>/dev/null
+  exit 0
+}
+trap stop_gracefully TERM INT
+
 echo "startup successful"
 keepAliveRegistration &
 skey_watchdog &
+# the log is followed in the background and waited for, so the trap above
+# runs at once (bash defers traps while a foreground child runs)
 while true; do
-  tail -f /var/log/scanner.log
+  tail -F /var/log/scanner.log &
+  TAIL_PID=$!
+  wait "$TAIL_PID"
 done
 exit 0

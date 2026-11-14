@@ -39,6 +39,8 @@ return array(
           'description' => 'eSCL: seconds between such retries.'),
     array('key' => 'ESCL_IDLE_TIMEOUT', 'group' => 'Scanner', 'type' => 'int', 'default' => '30', 'restart' => false, 'min' => 0, 'max' => 600,
           'description' => 'eSCL: seconds a scan waits for the scanner to report Idle before it starts anyway.'),
+    array('key' => 'STOP_TIMEOUT', 'group' => 'Scanner', 'type' => 'int', 'default' => '20', 'restart' => true, 'min' => 0, 'max' => 600,
+          'description' => 'When the container stops, waiting scans are turned into PDFs; seconds to wait for running scans and conversions (keep below the stop grace period).'),
     array('key' => 'SCANNER_PING_INTERVAL', 'group' => 'Scanner', 'type' => 'int', 'default' => '60', 'restart' => true, 'min' => 0, 'max' => 86400,
           'description' => 'Seconds between reachability checks of the scanner (0 disables).'),
     array('key' => 'SKEY_WATCHDOG', 'group' => 'Scanner', 'type' => 'bool', 'default' => 'true', 'restart' => true,

@@ -46,3 +46,15 @@ def test_nothing_waiting(jobs, tmp_path):
 
 def test_invalid_job_id_is_refused(jobs, tmp_path):
     assert finishjob.main(["--job-id", "../../etc"], log_path=str(tmp_path / "log")) == 2
+
+
+def test_all_waiting_jobs_are_finished_on_stop(jobs, tmp_path):
+    a = jobs("2026-01-01-10-00-00", "waiting_for_rear")
+    jobs("2026-01-01-10-10-00", "done", workdir=False)
+    b = jobs("2026-01-01-10-20-00", "waiting_for_rear")
+    assert finishjob.main(["--all"], log_path=str(tmp_path / "log")) == 0
+    assert a.exists() and b.exists()
+
+
+def test_all_with_nothing_waiting_is_fine(jobs, tmp_path):
+    assert finishjob.main(["--all"], log_path=str(tmp_path / "log")) == 0

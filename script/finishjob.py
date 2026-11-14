@@ -6,8 +6,10 @@ before it converts to PDF. This asks the waiting process to convert at once,
 so single-sided documents can be scanned one after the other.
 
 Called by the API (POST /api/jobs/<id>/finish, POST /api/scanner/finish) with
---job-id, and with IMAGE_BUTTON=finish by the scanner's Image button as
-"<script> <device> <friendly name>" (then the newest waiting job is meant).
+--job-id, with IMAGE_BUTTON=finish by the scanner's Image button as
+"<script> <device> <friendly name>" (then the newest waiting job is meant),
+and with --all by the entrypoint when the container stops, so no scanned
+front pages are lost with the waiting process.
 
 Exit status: 0 finished, 3 no such job waiting for rear pages, 2 bad arguments.
 """
@@ -35,6 +37,21 @@ def waiting_job(job_id: Optional[str]) -> Optional[str]:
     return None
 
 
+def waiting_jobs() -> List[str]:
+    """Every job that waits for rear pages, newest first."""
+    return [r["job"] for r in jobstate.list_jobs() if r.get("state") == "waiting_for_rear" and r.get("job")]
+
+
+def finish_all() -> int:
+    """Finish every waiting job (container shutdown: the waiting process would be killed)."""
+    finished = 0
+    for job in waiting_jobs():
+        if finish(job) == 0:
+            finished += 1
+    print(f"finish: {finished} waiting job(s) asked to convert now")
+    return 0
+
+
 def finish(job_id: Optional[str]) -> int:
     job = waiting_job(job_id)
     if job is None or not JOB_NAME_PATTERN.match(job):
@@ -55,6 +72,7 @@ def main(argv: List[str], log_path: str = LOG_PATH) -> int:
     parser.add_argument("device", nargs="?", default=None)
     parser.add_argument("friendly_name", nargs="?", default=None)
     parser.add_argument("--job-id", dest="job_id", default=None)
+    parser.add_argument("--all", action="store_true")
     args, _unknown = parser.parse_known_args(argv)
     if args.job_id is not None and not JOB_NAME_PATTERN.match(args.job_id):
         print(f"finish: invalid --job-id {args.job_id!r}", file=sys.stderr)
@@ -67,7 +85,7 @@ def main(argv: List[str], log_path: str = LOG_PATH) -> int:
                 read_environment()
             except OSError:
                 pass  # env.txt only matters for the jobs directory override
-            return finish(args.job_id)
+            return finish_all() if args.all else finish(args.job_id)
         finally:
             sys.stdout = stdout
 
