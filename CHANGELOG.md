@@ -6,6 +6,7 @@ All notable changes to the container. The Home Assistant integration, which incl
 
 ### Added
 
+- `SCANNER_DRIVER=brother-net`: Brother's network scan protocol (TCP 54921) spoken directly by `script/brother_net.py`, without a SANE backend. Default where the Brother drivers are not installed (arm64); button scans run in the device's Scan-to-PC session as with Brother's driver. Written from network captures, checked against Brother's output.
 - `SCANNER_DRIVER=escl` scans driverless over eSCL/AirScan with sane-airscan. Brother publishes its drivers for amd64 only; the image now also builds for arm64 (Raspberry Pi, Home Assistant), where it chooses eSCL and openskey automatically. Brother option names (`True Gray`, `FlatBed`, ...) are translated, the feeder is used when it holds paper, and a scan waits for the device to be idle (`ESCL_URL`, `ESCL_IDLE_TIMEOUT`).
 - `COPY_TO_DIR` copies every finished PDF into a folder, e.g. the consume folder of Paperless-ngx, under a temporary name that is renamed when complete.
 - `SCAN_TARGETS` offers several Scan-to-PC targets on the device panel, e.g. one per person, each with its own folder: openskey registers every name (`SKEY_NAMES`) and passes the picked one on; the job record names the target.

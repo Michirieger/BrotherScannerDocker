@@ -19,6 +19,7 @@ from sendtoftps import sendtoftps
 from trigger_inotify import trigger_inotify
 from trigger_telegram import trigger_telegram
 from ocr_queue import enqueue as enqueue_ocr
+import brother_net
 import escl
 import jobstate
 import thumbnails
@@ -320,6 +321,9 @@ def scan_cmd(
     scan_source = os.environ.get("SCAN_SOURCE", "").strip()
     if scan_source and not any(arg.startswith("--source=") for arg in scanimage_args):
         mode_args.append(f"--source={scan_source}")
+    if escl.active_driver() == BROTHER_NET:
+        run_brother_net(log, output_batch, mode_args + scanimage_args, int(resolution), area)
+        return
     if escl.is_escl():
         # eSCL (sane-airscan): Brother option names are translated, the device
         # gets time to leave the Scan-to-PC dialog, and without an explicit
@@ -369,6 +373,43 @@ def scan_cmd(
             execute_command(log, retry, check=True, capture=True)
         else:
             raise
+
+
+BROTHER_NET = "brother-net"
+
+
+def run_brother_net(log: TextIO, output_batch: str, args: List[str], resolution: int,
+                    area: Dict[str, str]) -> None:
+    """Scan with Brother's network protocol directly (script/brother_net.py).
+
+    No SANE backend is involved, so this works where Brother's driver does
+    not exist (arm64), and inside the Scan-to-PC session a button press opens.
+    The mode comes from --mode (Brother, eSCL or plain names); the device picks
+    the source itself (feeder when loaded, else the glass), so --source is
+    only logged. Failures are raised as CalledProcessError, like scanimage's.
+    """
+    mode = "color"
+    for arg in args:
+        if arg.startswith("--mode="):
+            mode = arg[len("--mode="):]
+        elif arg.startswith("--resolution="):
+            resolution = int(arg[len("--resolution="):])
+        elif arg.startswith("--source="):
+            print(f"  brother-net: the device picks the source itself, ignoring {arg}")
+    command = ["brother-net", f"mode={mode}", f"resolution={resolution}"]
+    print(f"  DEBUG: Executing command: {command}")
+    log.flush()
+    try:
+        brother_net.scan(
+            os.environ.get("IPADDRESS", "").strip(), output_batch, mode, resolution,
+            float(area["width"]), float(area["height"]),
+            log=lambda message: print(message),
+        )
+    except (brother_net.ScanError, OSError, ValueError, subprocess.CalledProcessError) as error:
+        print(f"  brother-net: {error}")
+        raise subprocess.CalledProcessError(1, command, output=str(error)) from error
+    finally:
+        log.flush()
 
 
 def batch_files(output_batch: str) -> List[str]:

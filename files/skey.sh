@@ -168,3 +168,18 @@ scan_targets() {
     printf '%s\t%s\n' "$target" "${dir:-$default_dir}"
   done
 }
+
+# brother_net_capabilities: the options brother-net offers, in the form
+# `scanimage -A` prints them, for the capabilities the API reports. The
+# device picks the source itself (feeder when loaded, else the glass).
+brother_net_capabilities() {
+  cat <<'CAPS'
+All options specific to device `brother-net' (Brother network protocol):
+    --mode Color|Gray|Lineart [Color]
+        Selects the scan mode.
+    --resolution 100|150|200|300|600dpi [300]
+        Sets the resolution of the scanned image.
+    --source Auto [Auto]
+        The device scans from the feeder when it holds paper, else from the glass.
+CAPS
+}
