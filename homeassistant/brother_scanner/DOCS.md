@@ -39,10 +39,12 @@ add-on (`/share/paperless/consume`).
 Every other setting of BrotherScannerDocker (README) can be set in the web
 UI's settings page.
 
-## Several people
+## Several people: scan targets
 
-With `scan_targets` every person gets their own entry in the scanner's
-Scan-to-PC list and their own folder:
+Normally the scanner lists one Scan-to-PC destination (`name`, "Scanner") and
+every scan lands in `copy_to_dir`. With `scan_targets` the scanner lists one
+destination **per entry**, e.g. one per person in a household, and every
+destination has its **own folder**:
 
 ```yaml
 scan_targets:
@@ -52,11 +54,26 @@ scan_targets:
     copy_to_dir: /share/paperless/consume/person_b
 ```
 
-On the scanner: Scan → File → pick your name → Start. One openskey daemon
-registers all names. In Paperless-ngx enable `consumer_recursive` and add a
-workflow per folder ("Consumption started", path filter
-`*/consume/person_b/*`) that assigns the owner. Scans started from the web UI
-or the Home Assistant buttons go to `copy_to_dir`.
+On the scanner: **Scan → File → pick your name → Start**. The PDF is made as
+usual and then copied to that name's folder.
+
+- **Names:** 1-15 letters, digits, `_` or `-` (what the panel shows). An entry
+  without `copy_to_dir` uses the add-on's `copy_to_dir`.
+- **One scan, one owner:** the name is stored with the scan. The rear pages
+  (**E-mail**) or finishing early (**Image**, see below) complete the scan of
+  whoever scanned the front pages, under whichever name they are pressed.
+- **Scans from Home Assistant or the web UI** have no name and go to
+  `copy_to_dir`.
+- The folders are created when the add-on starts.
+
+### With Paperless-ngx
+
+Paperless-ngx then sees one subfolder per person. Let it assign the owner:
+
+1. In the Paperless-ngx add-on enable `consumer_recursive` (reads subfolders).
+2. In Paperless-ngx add a workflow per person: trigger **Consumption
+   started**, path filter `*/consume/person_b/*`, action **assign owner**
+   (and permissions if the documents should stay private).
 
 ## Single-sided documents without waiting
 
@@ -65,12 +82,11 @@ scan (manual duplex: turn the stack, scan with **E-mail**). To go on at once:
 
 - the **Finish without rear pages** button of the Home Assistant integration,
   or `POST /api/scanner/finish`;
-- with `image_button: finish`, the **Image** button on the scanner. The panel
-  then waits for a scan that does not come; press Cancel (Stop) and scan the
-  next document.
+- with `image_button: finish`, **Scan → Image → Start** on the scanner, then
+  **Stop**: the panel waits for a scan that does not come.
 
 ## Requirements
 
-- The scanner must reach Home Assistant on UDP 54925 (and 54926, ... for further `scan_targets`), i.e. be in the same network.
+- The scanner must reach Home Assistant on UDP 54925 (button presses), i.e. be in the same network.
 - For Paperless-ngx: the add-on must be running; it consumes and removes the
   files from `/share/paperless/consume`.
