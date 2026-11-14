@@ -19,6 +19,9 @@ A value set in the container environment wins over the configuration file, and t
 | SCAN_TARGETS | optional | Several Scan-to-PC targets on the device panel, e.g. one per person: `Name=/folder;Other=/folder`. openskey registers every name (1-15 letters, digits, `_`, `-`) and tells the scan which one was picked; the PDF is copied to that target's folder instead of COPY_TO_DIR (an empty folder keeps COPY_TO_DIR). A rear scan or an early finish keeps the target of the front scan. Needs `SKEY_DAEMON=openskey` (default: the single target NAME) |
 | IMAGE_BUTTON | optional | `image` or `finish`. With `finish` the Image button on the device converts the job that waits for rear pages at once, so single-sided documents need no REAR_PAGE_WAIT_SECONDS wait; the API offers the same as `POST /api/scanner/finish` (default: image) |
 | ESCL_URL | optional | eSCL service of the scanner for `SCANNER_DRIVER=escl` (default: `http://IPADDRESS/eSCL`) |
+| ESCL_BUTTON_DELAY | optional | eSCL: seconds a button-started scan waits before it starts; the device cancels a job that arrives together with the button press (default: 5) |
+| ESCL_RETRIES | optional | eSCL: how often a scan the device refused (`Error during device I/O`) is retried, only while no paper has moved: the feeder still holds its paper, or the scan is from the glass (default: 2) |
+| ESCL_RETRY_DELAY | optional | eSCL: seconds between those retries (default: 10) |
 | ESCL_IDLE_TIMEOUT | optional | eSCL: seconds a scan waits for the scanner to report Idle (e.g. after a button press) before it starts anyway (default: 30) |
 | HOST_IPADDRESS | optional | IP address under which the scanner reaches this container (bridged networking, see [Setup](setup.md)); empty for host networking |
 | TZ | optional | Time zone for file names, logs and the web UI, e.g. `Europe/Berlin` (default: UTC) |

@@ -326,6 +326,7 @@ def scan_cmd(
         # source the ADF is used when it holds paper, as Brother's drivers do.
         mode_args = escl.translate_args(mode_args)
         scanimage_args = escl.translate_args(scanimage_args)
+        escl.settle_after_button()
         status = escl.wait_until_idle()
         if not any(arg.startswith("--source=") for arg in mode_args + scanimage_args):
             source = escl.default_source(status)
@@ -346,7 +347,10 @@ def scan_cmd(
     ]
     # fmt: on
     try:
-        execute_command(log, scan_command, check=True, capture=True)
+        if escl.is_escl():
+            run_escl_scan(log, scan_command, output_batch)
+        else:
+            execute_command(log, scan_command, check=True, capture=True)
     except subprocess.CalledProcessError as error:
         # brscan5 aborts with "Document feeder out of documents" when the ADF is
         # empty, where brscan4 silently fell back to the flatbed (#180). When no
@@ -365,6 +369,46 @@ def scan_cmd(
             execute_command(log, retry, check=True, capture=True)
         else:
             raise
+
+
+def batch_files(output_batch: str) -> List[str]:
+    """The page files a scanimage --batch=<pattern> run has written."""
+    return sorted(glob.glob(re.sub(r"%0?\d*d", "*", output_batch)))
+
+
+def run_escl_scan(log: TextIO, scan_command: List[str], output_batch: str) -> None:
+    """Run an eSCL scan, retrying when the device refused it before any paper moved.
+
+    Right after a Scan-to-PC button press the device may cancel an eSCL job
+    (JobCanceledAtDevice, "Error during device I/O") or answer 500 for a few
+    seconds. When that happens before a page was fed (the feeder still holds
+    the paper it held before, or the scan is from the glass), the partial page
+    files are removed and the scan is retried after ESCL_RETRY_DELAY seconds,
+    at most ESCL_RETRIES times. Once paper has moved, nothing is retried: a
+    second run would scan the wrong pages.
+    """
+    retries = escl.int_setting("ESCL_RETRIES", 2)
+    delay = escl.int_setting("ESCL_RETRY_DELAY", 10)
+    from_feeder = any(arg == f"--source={escl.ESCL_ADF}" or arg == f"--source={escl.ESCL_ADF_DUPLEX}"
+                      for arg in scan_command)
+    for attempt in range(retries + 1):
+        before = escl.scanner_status() if from_feeder else None
+        try:
+            execute_command(log, scan_command, check=True, capture=True)
+            return
+        except subprocess.CalledProcessError as error:
+            output = (error.output or "").lower()
+            refused = "error during device i/o" in output or "invalid argument" in output
+            after = escl.scanner_status() if from_feeder else None
+            paper_unmoved = not from_feeder or (escl.adf_loaded(before) and escl.adf_loaded(after))
+            if attempt >= retries or not refused or not paper_unmoved or adf_empty_from_start(output):
+                raise
+            for page in batch_files(output_batch):
+                os.remove(page)
+            print(f"  eSCL: the device refused the scan before any paper moved; retrying in {delay}s "
+                  f"({attempt + 1}/{retries})")
+            log.flush()
+            time.sleep(delay)
 
 
 TARGET_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,15}$")

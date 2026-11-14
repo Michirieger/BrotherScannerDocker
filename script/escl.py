@@ -156,3 +156,28 @@ def wait_until_idle(timeout_s: Optional[float] = None, poll_s: float = 1.0) -> O
 def default_source(status: Optional[dict]) -> str:
     """ADF when paper is loaded there, else the flatbed (Brother driver behaviour)."""
     return ESCL_ADF if adf_loaded(status) else ESCL_FLATBED
+
+
+def int_setting(name: str, default: int) -> int:
+    """A non-negative whole number from the environment, else `default`."""
+    try:
+        value = int(os.environ.get(name, "").strip())
+    except ValueError:
+        return default
+    return value if value >= 0 else default
+
+
+def settle_after_button() -> None:
+    """Give the device ESCL_BUTTON_DELAY seconds (default 5) after a button press.
+
+    The Scan-to-PC press puts the device into its "connecting to PC" state;
+    an eSCL job that arrives in the same moment is cancelled at the device.
+    Button-started scans are recognised by the event openskey hands on
+    (SKEY_FUNC); API scans start at once.
+    """
+    if not os.environ.get("SKEY_FUNC", "").strip():
+        return
+    delay = int_setting("ESCL_BUTTON_DELAY", 5)
+    if delay:
+        print(f"  eSCL: button press, waiting {delay}s for the device before scanning")
+        time.sleep(delay)

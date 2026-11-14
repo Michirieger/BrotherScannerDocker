@@ -99,6 +99,8 @@ def test_active_driver(tmp_path):
 
 @pytest.fixture
 def captured(monkeypatch):
+    monkeypatch.setattr(escl, "scanner_status", lambda: {"state": "Idle", "adf": "ScannerAdfLoaded"})
+    monkeypatch.setattr(escl, "settle_after_button", lambda: None)
     commands = []
     monkeypatch.setattr(scanner, "execute_command", lambda log, command, **kw: commands.append(command))
     return commands
@@ -195,3 +197,63 @@ def test_waiting_for_rear_pages_ends_early_on_the_finish_flag(clean_env, tmp_pat
     scanner.wait_for_rear_pages_or_convert(job)
     assert scanner.time.monotonic() - started < 5
     assert converted == [(job, "front")]
+
+
+# --- refused jobs after a button press -------------------------------------
+
+def _refused(command):
+    import subprocess
+    raise subprocess.CalledProcessError(7, command, output="scanimage: sane_start: Error during device I/O")
+
+
+def test_escl_scan_is_retried_while_the_paper_has_not_moved(clean_env, monkeypatch, tmp_path):
+    calls = []
+
+    def fake(log, command, **kw):
+        calls.append(command)
+        (tmp_path / "x0001.pnm").write_bytes(b"partial")
+        if len(calls) == 1:
+            _refused(command)
+
+    monkeypatch.setattr(scanner, "execute_command", fake)
+    monkeypatch.setattr(escl, "scanner_status", lambda: {"state": "Idle", "adf": "ScannerAdfLoaded"})
+    monkeypatch.setattr(scanner.time, "sleep", lambda _s: None)
+    scanner.run_escl_scan(io.StringIO(), ["scanimage", "--source=ADF"], str(tmp_path / "x%04d.pnm"))
+    assert len(calls) == 2
+
+
+def test_escl_scan_is_not_retried_once_paper_moved(clean_env, monkeypatch, tmp_path):
+    import subprocess
+    calls = []
+    monkeypatch.setattr(scanner, "execute_command", lambda log, command, **kw: (calls.append(command), _refused(command)))
+    states = iter([{"adf": "ScannerAdfLoaded"}, {"adf": "ScannerAdfEmpty"}])
+    monkeypatch.setattr(escl, "scanner_status", lambda: next(states))
+    monkeypatch.setattr(scanner.time, "sleep", lambda _s: None)
+    with pytest.raises(subprocess.CalledProcessError):
+        scanner.run_escl_scan(io.StringIO(), ["scanimage", "--source=ADF"], str(tmp_path / "x%04d.pnm"))
+    assert len(calls) == 1
+
+
+def test_escl_scan_gives_up_after_the_retries(clean_env, monkeypatch, tmp_path):
+    import subprocess
+    calls = []
+    monkeypatch.setattr(scanner, "execute_command", lambda log, command, **kw: (calls.append(command), _refused(command)))
+    monkeypatch.setattr(scanner.time, "sleep", lambda _s: None)
+    clean_env.setenv("ESCL_RETRIES", "1")
+    with pytest.raises(subprocess.CalledProcessError):
+        scanner.run_escl_scan(io.StringIO(), ["scanimage", "--source=Flatbed"], str(tmp_path / "x%04d.pnm"))
+    assert len(calls) == 2
+
+
+def test_button_scans_wait_for_the_device(clean_env, monkeypatch):
+    slept = []
+    monkeypatch.setattr(escl.time, "sleep", slept.append)
+    clean_env.delenv("SKEY_FUNC", raising=False)
+    escl.settle_after_button()
+    assert slept == []
+    clean_env.setenv("SKEY_FUNC", "FILE")
+    escl.settle_after_button()
+    assert slept == [5]
+    clean_env.setenv("ESCL_BUTTON_DELAY", "0")
+    escl.settle_after_button()
+    assert slept == [5]
