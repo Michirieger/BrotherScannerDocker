@@ -1,11 +1,11 @@
 # Home Assistant add-on for BrotherScannerDocker: scan with the buttons on a
 # Brother scanner (Scan to PC) into a folder, e.g. the consume folder of the
-# Paperless-ngx add-on. Runs on amd64 (Brother drivers or eSCL) and aarch64
-# (eSCL, Brother publishes no ARM drivers); openskey handles the buttons.
+# Paperless-ngx add-on. Runs on amd64 (Brother drivers) and aarch64 (Brother's
+# network protocol in Python, brother-net); openskey handles the buttons.
 name: Brother Scanner
-version: "0.2.0"
+version: "0.3.0"
 slug: brother_scanner
-description: Scan to file with the buttons on a Brother scanner (BrotherScannerDocker, eSCL on ARM)
+description: Scan to file with the buttons on a Brother scanner (BrotherScannerDocker, also on ARM)
 url: https://github.com/Michirieger/BrotherScannerDocker/tree/master/homeassistant/brother_scanner
 arch:
   - aarch64
@@ -38,7 +38,7 @@ schema:
   host_ipaddress: str?
   model: str
   name: match(^\S+$)
-  scanner_driver: list(auto|escl|brscan4|brscan5)
+  scanner_driver: list(auto|brother-net|escl|brscan4|brscan5)
   skey_daemon: list(openskey|brscan-skey)
   copy_to_dir: str?
   scan_targets:

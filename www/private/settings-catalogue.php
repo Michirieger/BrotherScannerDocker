@@ -24,7 +24,7 @@ return array(
     array('key' => 'KEEPALIVE_INTERVAL', 'group' => 'Scanner', 'type' => 'int', 'default' => '120', 'restart' => true, 'min' => 10, 'max' => 359,
           'description' => 'Seconds between registration refreshes (below the device lease of 360 s).'),
     array('key' => 'SCANNER_DRIVER', 'group' => 'Scanner', 'type' => 'string', 'default' => 'auto', 'restart' => true,
-          'description' => 'Scanner driver: auto (brscan4 when it knows the model, else brscan5; escl where the Brother drivers are not installed, e.g. arm64), brscan4, brscan5 or escl (driverless eSCL/AirScan).'),
+          'description' => 'Scanner driver: auto (brscan4 when it knows the model, else brscan5; brother-net where the Brother drivers are not installed, e.g. arm64), brscan4, brscan5, brother-net (Brother network protocol without a SANE backend) or escl (driverless eSCL/AirScan).'),
     array('key' => 'SCAN_TARGETS', 'group' => 'Scanner', 'type' => 'string', 'default' => '', 'restart' => true,
           'description' => 'Several Scan-to-PC targets on the device panel, each with its own folder: Name=/folder;Other=/folder (openskey only; empty: the single target NAME).'),
     array('key' => 'IMAGE_BUTTON', 'group' => 'Scanner', 'type' => 'string', 'default' => 'image', 'restart' => true,

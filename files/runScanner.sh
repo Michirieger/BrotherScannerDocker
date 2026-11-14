@@ -279,12 +279,18 @@ unregister_driver() { # $1 = 4|5
 BRSCAN4_CFG=/opt/brother/scanner/brscan4/brsanenetdevice4.cfg
 BRSCAN5_CFG=/opt/brother/scanner/brscan5/brsanenetdevice.cfg
 SCANNER_DRIVER="${SCANNER_DRIVER:-auto}"
-if [[ "${SCANNER_DRIVER,,}" != "escl" && ! -x /usr/bin/brsaneconfig4 ]]; then
-  # no Brother drivers on this architecture (they are amd64-only)
-  echo "Brother SANE drivers are not installed on this architecture, using eSCL"
-  SCANNER_DRIVER=escl
+if [[ "${SCANNER_DRIVER,,}" != "escl" && "${SCANNER_DRIVER,,}" != "brother-net" && ! -x /usr/bin/brsaneconfig4 ]]; then
+  # no Brother drivers on this architecture (they are amd64-only): speak
+  # Brother's network protocol directly (script/brother_net.py)
+  echo "Brother SANE drivers are not installed on this architecture, using brother-net"
+  SCANNER_DRIVER=brother-net
 fi
 case "${SCANNER_DRIVER,,}" in
+  brother-net)
+    # Brother's scan protocol on TCP 54921 without a SANE backend; the scan
+    # scripts call script/brother_net.py instead of scanimage
+    DRIVER=brother-net
+    ;;
   escl)
     # Driverless scanning over eSCL/AirScan (sane-airscan), see script/escl.py
     ESCL_URL="${ESCL_URL:-http://$IPADDRESS/eSCL}"
@@ -481,8 +487,13 @@ echo "-----"
 echo "capabilities:"
 # the registered device (one backend, brother4 or brother5), then its option lists,
 # kept for /api/actions (device.capabilities)
-scanimage -L 2>&1 | grep -iE 'brother|airscan' || true
-scanimage -A > /tmp/SCANNER_CAPABILITIES 2>&1 || true
+if [[ "$DRIVER" == "brother-net" ]]; then
+  # the option lists for /api/actions, in scanimage -A form (device.php)
+  brother_net_capabilities >/tmp/SCANNER_CAPABILITIES
+else
+  scanimage -L 2>&1 | grep -iE 'brother|airscan' || true
+  scanimage -A > /tmp/SCANNER_CAPABILITIES 2>&1 || true
+fi
 chmod 644 /tmp/SCANNER_CAPABILITIES
 cat /tmp/SCANNER_CAPABILITIES
 

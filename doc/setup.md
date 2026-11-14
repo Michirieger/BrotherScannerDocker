@@ -66,9 +66,17 @@ A model unknown to both drivers runs on brscan4 with a generic profile, which ma
 
 One behaviour differs between the drivers: with an empty feeder and no `SCAN_SOURCE` set, brscan4 scans from the flatbed, while brscan5 aborts with "Document feeder out of documents". So that one button still works for both the feeder and the glass, a scan that finds the feeder empty is retried once from the flatbed (#180). Setting `SCAN_SOURCE` or `SCANNER_DRIVER=brscan4` keeps the old behaviour.
 
+### brother-net (arm64)
+
+Brother publishes its drivers for i386/amd64 only. On other architectures (arm64: Raspberry Pi, Home Assistant Green/Yellow) the image speaks Brother's network scan protocol on TCP 54921 itself (`script/brother_net.py`, `SCANNER_DRIVER=brother-net`, chosen automatically there; selectable on amd64 too). It is the protocol Brother's backend uses, so a button press works as with Brother's driver: the device shows "connecting to PC" and the scan runs in that session. Written from network captures of an MFC-L2710DW with Brother's driver and checked against the images that driver produced (grayscale and black & white byte-identical, colour pixel-identical); other brscan4 models very likely work the same way. Modes: Color, Gray, Lineart (Brother's names work too); the device picks the source itself (feeder when loaded, else the glass). Not affiliated with Brother; no Brother code is used.
+
+```
+scanner driver: brother-net for model MFC-L2710DW
+```
+
 ### eSCL (driverless, arm64)
 
-Brother publishes its drivers for i386/amd64 only. On other architectures (arm64: Raspberry Pi, Home Assistant Green/Yellow) the image contains no Brother drivers and scans driverless over eSCL/AirScan with [sane-airscan](https://github.com/alexpevzner/sane-airscan) instead; `SCANNER_DRIVER=escl` selects this on amd64 too. Most network models since about 2017 offer eSCL (check `http://<IPADDRESS>/eSCL/ScannerCapabilities`). The device buttons need `SKEY_DAEMON=openskey`, which is chosen automatically where Brother's daemon is missing:
+As an alternative, `SCANNER_DRIVER=escl` scans driverless over eSCL/AirScan with [sane-airscan](https://github.com/alexpevzner/sane-airscan). On the MFC-L2710DW the device cancels an eSCL job while it waits for the PC after a button press, so button scans need `ESCL_BUTTON_DELAY` and retries (or Stop on the panel); brother-net has no such wait. Most network models since about 2017 offer eSCL (check `http://<IPADDRESS>/eSCL/ScannerCapabilities`). The device buttons need `SKEY_DAEMON=openskey`, which is chosen automatically where Brother's daemon is missing:
 
 ```
 scanner driver: escl for model MFC-L2710DW

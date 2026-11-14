@@ -9,11 +9,11 @@ add-on (`/share/paperless/consume`).
 - **Buttons:** [openskey](https://github.com/PhilippMundhenk/openskey) registers
   this host on the device as a "Scan to PC" destination (SNMP) and receives the
   button presses (UDP 54925).
-- **Scanning:** on aarch64 (Raspberry Pi, Home Assistant Green/Yellow) the
-  device is scanned over eSCL/AirScan with sane-airscan, because Brother
-  publishes its scanner drivers for x86 only. On amd64 the Brother drivers are
-  used when they know the model (`scanner_driver: auto`), or eSCL when you
-  choose `escl`.
+- **Scanning:** on aarch64 (Raspberry Pi, Home Assistant Green/Yellow), where
+  Brother publishes no drivers, the add-on speaks Brother's network scan
+  protocol itself (`brother-net`): a button press works as with Brother's
+  driver. On amd64 the Brother drivers are used when they know the model
+  (`scanner_driver: auto`). `escl` (eSCL/AirScan) is the fallback.
 - **Output:** pages are combined to one PDF, kept in the add-on, and copied to
   `copy_to_dir` (written under a temporary name and renamed, so Paperless never
   picks up a partial file).
@@ -26,7 +26,7 @@ add-on (`/share/paperless/consume`).
 | `host_ipaddress` | Address of Home Assistant the scanner sends button events to; detected when empty |
 | `model` | Model name, e.g. `MFC-L2710DW` |
 | `name` | Name shown on the scanner display (no spaces) |
-| `scanner_driver` | `auto`, `escl`, `brscan4`, `brscan5` |
+| `scanner_driver` | `auto`, `brother-net`, `escl`, `brscan4`, `brscan5` |
 | `copy_to_dir` | Folder that receives every finished PDF; empty to disable |
 | `scan_targets` | Several names on the scanner panel, each with its own folder, e.g. one per person (see below) |
 | `image_button` | `finish`: the **Image** button on the scanner finishes the current scan at once instead of waiting for rear pages (see below) |
